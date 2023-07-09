@@ -1,7 +1,9 @@
 package com.wafflestudio.k8s
 
-import com.wafflestudio.k8s.job.MakeAlert
+import com.wafflestudio.k8s.job.MakeJobAlert
 import com.wafflestudio.k8s.job.OnCronJobFailed
+import com.wafflestudio.k8s.pod.MakePodAlert
+import com.wafflestudio.k8s.pod.OnPodFailed
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
@@ -17,7 +19,11 @@ fun main(): Unit = runBlocking {
 
         with(k8sContext) {
             OnCronJobFailed { job ->
-                MakeAlert(job)
+                MakeJobAlert(job)
+            }
+
+            OnPodFailed { pod ->
+                MakePodAlert(pod)
             }
         }
     }
