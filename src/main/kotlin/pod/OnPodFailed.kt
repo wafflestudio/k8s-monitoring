@@ -12,20 +12,13 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToFlow
 
-context(CoroutineScope, K8sContext)
-class OnPodFailed(block: (failedPod: Pod) -> Unit) {
-    init {
-        val logger = LoggerFactory.getLogger(javaClass)
+object OnPodFailed {
+    private val logger = LoggerFactory.getLogger(javaClass)
 
-        val client = WebClient.builder()
-            .insecure()
-            .baseUrl(apiUrl)
-            .defaultHeader("Authorization", "Bearer $apiToken")
-            .build()
-
+    context(CoroutineScope, K8sContext)
+    operator fun invoke(block: suspend (failedPod: Pod) -> Unit) {
         fun isFailedPod(pod: Pod): Boolean {
             return pod.type == Type.MODIFIED && pod.containerStatuses.any { it is ContainerStatus.Waiting && it.failed }
         }
