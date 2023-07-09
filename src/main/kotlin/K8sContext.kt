@@ -3,11 +3,11 @@ package com.wafflestudio.k8s
 import org.springframework.boot.cloud.CloudPlatform
 import org.springframework.context.ApplicationContext
 import org.springframework.core.env.Environment
+import org.springframework.web.reactive.function.client.WebClient
 import java.io.File
 
 data class K8sContext(
-    val apiUrl: String,
-    val apiToken: String,
+    val client: WebClient,
 ) {
 
     companion object {
@@ -25,8 +25,11 @@ data class K8sContext(
             val k8sApiToken = File(KUBERNETES_API_TOKEN_PATH).takeIf { it.exists() }?.readText() ?: return null
 
             return K8sContext(
-                apiUrl = "https://$k8sApiHost:$k8sApiPort",
-                apiToken = k8sApiToken
+                client = WebClient.builder()
+                    .insecure()
+                    .baseUrl("https://$k8sApiHost:$k8sApiPort")
+                    .defaultHeader("Authorization", "Bearer $k8sApiToken")
+                    .build()
             )
         }
     }
