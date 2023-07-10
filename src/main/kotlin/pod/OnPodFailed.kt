@@ -2,7 +2,6 @@ package com.wafflestudio.k8s.pod
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.wafflestudio.k8s.K8sContext
-import com.wafflestudio.k8s.insecure
 import com.wafflestudio.k8s.pod.Pod.ContainerStatus
 import com.wafflestudio.k8s.pod.Pod.Type
 import kotlinx.coroutines.CoroutineScope
