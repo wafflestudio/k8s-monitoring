@@ -14,7 +14,6 @@ data class Pod(
     val phase: Phase,
     val containerStatuses: List<ContainerStatus>,
     val startTime: Instant,
-    val metadata: Metadata,
 ) {
     enum class Type {
         ADDED, DELETED, MODIFIED, UNKNOWN
@@ -23,10 +22,6 @@ data class Pod(
     enum class Phase {
         RUNNING, PENDING, UNKNOWN
     }
-
-    data class Metadata(
-        val alertCount: Int,
-    )
 
     sealed class ContainerStatus {
         abstract val name: String
@@ -70,7 +65,6 @@ data class Pod(
             val name = get("object")?.get("metadata")?.get("name")?.asText() ?: return null
             val phase = get("object")?.get("status")?.get("phase")?.asText() ?: return null
             val startTime = get("object")?.get("status")?.get("startTime")?.asText() ?: return null
-            val alertCount = get("object")?.get("metadata")?.get("annotations")?.get("alertCount")?.asInt() ?: 0
             val containerStatuses = get("object")?.get("status")?.get("containerStatuses")
                 ?.map {
                     val containerName = it["name"].asText()
@@ -115,7 +109,6 @@ data class Pod(
                 phase = Phase.values().firstOrNull { it.name == phase.uppercase() } ?: Phase.UNKNOWN,
                 containerStatuses = containerStatuses,
                 startTime = Instant.parse(startTime),
-                metadata = Metadata(alertCount)
             )
                 .also { // for debug
                     if (it.type == Type.UNKNOWN || it.phase == Phase.UNKNOWN || it.containerStatuses.any { it is UnKnown }) {

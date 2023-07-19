@@ -48,9 +48,6 @@ class NoOpPodAlert : PodAlert {
     }
 }
 
-val Pod.alertAllowed: Boolean
-    get() = metadata.alertCount < 5
-
 val Pod.alertMessage: String
     get() = buildString {
         appendLine("[Pod Failed]")

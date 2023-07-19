@@ -2,10 +2,10 @@ package com.wafflestudio.k8s
 
 import com.wafflestudio.k8s.job.MakeJobAlert
 import com.wafflestudio.k8s.job.OnCronJobFailed
-import com.wafflestudio.k8s.pod.IncrementPodAlertCount
+import com.wafflestudio.k8s.pod.GetPodAlertCount
 import com.wafflestudio.k8s.pod.MakePodAlert
 import com.wafflestudio.k8s.pod.OnPodFailed
-import com.wafflestudio.k8s.pod.alertAllowed
+import com.wafflestudio.k8s.pod.WritePodAlertCount
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
@@ -25,8 +25,13 @@ fun main(): Unit = runBlocking {
             }
 
             OnPodFailed { pod ->
-                if (pod.alertAllowed && MakePodAlert(pod)) {
-                    IncrementPodAlertCount(pod)
+                val alertCount = GetPodAlertCount(pod)
+
+                if (alertCount < 3 && MakePodAlert(pod)) {
+                    WritePodAlertCount(
+                        pod = pod,
+                        alertCount = alertCount + 1
+                    )
                 }
             }
         }
