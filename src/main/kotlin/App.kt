@@ -2,6 +2,9 @@ package com.wafflestudio.k8s
 
 import com.wafflestudio.k8s.job.MakeJobAlert
 import com.wafflestudio.k8s.job.OnCronJobFailed
+import com.wafflestudio.k8s.node.MakeNodAddedAlert
+import com.wafflestudio.k8s.node.MakeNodeDeletedAlert
+import com.wafflestudio.k8s.node.OnNodeChanged
 import com.wafflestudio.k8s.pod.GetPodAlertCount
 import com.wafflestudio.k8s.pod.MakePodAlert
 import com.wafflestudio.k8s.pod.OnPodFailed
@@ -20,9 +23,7 @@ fun main(): Unit = runBlocking {
         val k8sContext = K8sContext.get() ?: return@with
 
         with(k8sContext) {
-            OnCronJobFailed { job ->
-                MakeJobAlert(job)
-            }
+            OnCronJobFailed { job -> MakeJobAlert(job) }
 
             OnPodFailed { pod ->
                 val alertCount = GetPodAlertCount(pod)
@@ -32,6 +33,13 @@ fun main(): Unit = runBlocking {
                         pod = pod,
                         alertCount = alertCount + 1
                     )
+                }
+            }
+
+            OnNodeChanged { node ->
+                when {
+                    node.isAdded -> MakeNodAddedAlert(node)
+                    node.isDeleted -> MakeNodeDeletedAlert(node)
                 }
             }
         }

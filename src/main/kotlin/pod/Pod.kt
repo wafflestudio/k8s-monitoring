@@ -20,7 +20,7 @@ data class Pod(
     }
 
     enum class Phase {
-        RUNNING, PENDING, UNKNOWN
+        RUNNING, PENDING, COMPLETED, UNKNOWN
     }
 
     sealed class ContainerStatus {
