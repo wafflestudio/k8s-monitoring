@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import org.slf4j.LoggerFactory
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
@@ -18,27 +19,34 @@ fun interface JobAlert {
 @Component
 class SlackJobAlert(
     @Value("\${slack.token}") token: String,
+    @Value("\${slack.default-channel-id:C05FSP4MEVC}") private val defaultChannelId: String,
 ) : JobAlert {
     private val client = Slack.getInstance().methodsAsync(token)
+    private val log = LoggerFactory.getLogger(javaClass)
     private val namespaceToChannel = emptyMap<String, String>()
 
     override suspend fun invoke(job: Job): Boolean {
-        val channel = namespaceToChannel[job.namespace] ?: "k8s-알람"
+        val channel = namespaceToChannel[job.namespace] ?: defaultChannelId
         val fileName = "${job.namespace}-${job.cronJobName}.txt"
 
-        return client.filesUploadV2 { req ->
-            req.channel(channel)
-                .uploadFiles(listOf(
-                    FilesUploadV2Request.UploadFile.builder()
-                        .content(job.alertMessage)
-                        .filename(fileName)
-                        .title(fileName)
-                        .build()
-                ))
-                .initialComment("[Job Failed]\nNamespace: ${job.namespace}\nCronJob: ${job.cronJobName}")
+        return runCatching {
+            client.filesUploadV2 { req ->
+                req.channel(channel)
+                    .uploadFiles(listOf(
+                        FilesUploadV2Request.UploadFile.builder()
+                            .content(job.alertMessage)
+                            .filename(fileName)
+                            .title(fileName)
+                            .build()
+                    ))
+                    .initialComment("[Job Failed]\nNamespace: ${job.namespace}\nCronJob: ${job.cronJobName}")
+            }
+                .await()
+                .isOk
+        }.getOrElse {
+            log.error("Failed to upload job alert to Slack (channel: {}, job: {}.{})", channel, job.namespace, job.name, it)
+            false
         }
-            .await()
-            .isOk
     }
 }
 

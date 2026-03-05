@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import org.slf4j.LoggerFactory
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
@@ -19,27 +20,34 @@ fun interface PodAlert {
 @Component
 class SlackPodAlert(
     @Value("\${slack.token}") token: String,
+    @Value("\${slack.default-channel-id:C05FSP4MEVC}") private val defaultChannelId: String,
 ) : PodAlert {
     private val client = Slack.getInstance().methodsAsync(token)
+    private val log = LoggerFactory.getLogger(javaClass)
     private val namespaceToChannel = emptyMap<String, String>()
 
     override suspend fun invoke(pod: Pod): Boolean {
-        val channel = namespaceToChannel[pod.namespace] ?: "k8s-알람"
+        val channel = namespaceToChannel[pod.namespace] ?: defaultChannelId
         val fileName = "${pod.namespace}-${pod.name}.txt"
 
-        return client.filesUploadV2 { req ->
-            req.channel(channel)
-                .uploadFiles(listOf(
-                    FilesUploadV2Request.UploadFile.builder()
-                        .content(pod.alertMessage)
-                        .filename(fileName)
-                        .title(fileName)
-                        .build()
-                ))
-                .initialComment("[Pod Failed]\nNamespace: ${pod.namespace}\nPod: ${pod.name}")
+        return runCatching {
+            client.filesUploadV2 { req ->
+                req.channel(channel)
+                    .uploadFiles(listOf(
+                        FilesUploadV2Request.UploadFile.builder()
+                            .content(pod.alertMessage)
+                            .filename(fileName)
+                            .title(fileName)
+                            .build()
+                    ))
+                    .initialComment("[Pod Failed]\nNamespace: ${pod.namespace}\nPod: ${pod.name}")
+            }
+                .await()
+                .isOk
+        }.getOrElse {
+            log.error("Failed to upload pod alert to Slack (channel: {}, pod: {}.{})", channel, pod.namespace, pod.name, it)
+            false
         }
-            .await()
-            .isOk
     }
 }
 
