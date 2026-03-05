@@ -1,6 +1,7 @@
 package com.wafflestudio.k8s.node
 
 import com.slack.api.Slack
+import com.slack.api.methods.request.files.FilesUploadV2Request
 import kotlinx.coroutines.future.await
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -22,15 +23,18 @@ class SlackNodeAddedAlert(
 
     override suspend fun invoke(node: Node): Boolean {
         val channel = "k8s-알람"
+        val fileName = "${node.name}.txt"
 
-        return client.filesUpload { builder ->
-            builder.apply {
-                filetype("text")
-                title("${node.name}.txt")
-                channels(listOf(channel))
-                content(node.addedAlertMessage)
-                initialComment("[Node Added]")
-            }
+        return client.filesUploadV2 { req ->
+            req.channel(channel)
+                .uploadFiles(listOf(
+                    FilesUploadV2Request.UploadFile.builder()
+                        .content(node.addedAlertMessage)
+                        .filename(fileName)
+                        .title(fileName)
+                        .build()
+                ))
+                .initialComment("[Node Added]")
         }
             .await()
             .isOk

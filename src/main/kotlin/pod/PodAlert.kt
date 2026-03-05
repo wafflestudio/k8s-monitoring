@@ -1,6 +1,7 @@
 package com.wafflestudio.k8s.pod
 
 import com.slack.api.Slack
+import com.slack.api.methods.request.files.FilesUploadV2Request
 import com.wafflestudio.k8s.pod.Pod.ContainerStatus.Waiting
 import kotlinx.coroutines.future.await
 import org.springframework.beans.factory.annotation.Value
@@ -24,15 +25,18 @@ class SlackPodAlert(
 
     override suspend fun invoke(pod: Pod): Boolean {
         val channel = namespaceToChannel[pod.namespace] ?: "k8s-알람"
+        val fileName = "${pod.namespace}-${pod.name}.txt"
 
-        return client.filesUpload { builder ->
-            builder.apply {
-                filetype("text")
-                title("${pod.namespace}-${pod.name}.txt")
-                channels(listOf(channel))
-                content(pod.alertMessage)
-                initialComment("[Pod Failed]\nNamespace: ${pod.namespace}\nPod: ${pod.name}")
-            }
+        return client.filesUploadV2 { req ->
+            req.channel(channel)
+                .uploadFiles(listOf(
+                    FilesUploadV2Request.UploadFile.builder()
+                        .content(pod.alertMessage)
+                        .filename(fileName)
+                        .title(fileName)
+                        .build()
+                ))
+                .initialComment("[Pod Failed]\nNamespace: ${pod.namespace}\nPod: ${pod.name}")
         }
             .await()
             .isOk
