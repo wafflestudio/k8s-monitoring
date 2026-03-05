@@ -24,7 +24,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8")
 
-    implementation("com.slack.api:slack-api-client:1.28.0")
+    implementation("com.slack.api:slack-api-client:1.38.1")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.projectreactor:reactor-test")
 }
@@ -78,6 +78,55 @@ task("dockerPush") {
                 "push",
                 "405906814034.dkr.ecr.ap-northeast-2.amazonaws.com/k8s-monitoring:${project.version}"
             )
+        }
+    }
+}
+
+val ocirRegistry = "yny.ocir.io"
+val ocirNamespace = "ax1dvc8vmenm"
+val ocirUsername = "$ocirNamespace/members/snutt-deployer"
+val ocirRepository = "k8s-monitoring"
+val ocirImageTag = "$ocirRegistry/$ocirNamespace/$ocirRepository:${project.version}"
+
+task("ocirBuild") {
+    dependsOn("bootJar")
+
+    doLast {
+        val authToken = System.getenv("OCIR_AUTH_TOKEN") ?: error("OCIR_AUTH_TOKEN env variable is required")
+
+        val dir = project.mkdir(File(project.buildDir, "tmp"))
+        val dockerFile = File(dir, "Dockerfile")
+
+        dockerFile.writeText(project.file("Dockerfile").inputStream().reader().readText())
+
+        project.copy {
+            from(project.tasks.getByName<Jar>("bootJar").archiveFile) { rename { "app.jar" } }
+            into(dir)
+        }
+
+        project.exec {
+            commandLine("docker", "login", ocirRegistry, "-u", ocirUsername, "-p", authToken)
+        }
+
+        project.exec {
+            workingDir(dir)
+            commandLine(
+                "docker", "build",
+                "--platform", "linux/arm64",
+                "--provenance=false",
+                "-t", ocirImageTag,
+                "."
+            )
+        }
+    }
+}
+
+task("ocirPush") {
+    dependsOn("ocirBuild")
+
+    doLast {
+        project.exec {
+            commandLine("docker", "push", ocirImageTag)
         }
     }
 }

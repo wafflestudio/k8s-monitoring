@@ -1,6 +1,7 @@
 package com.wafflestudio.k8s.job
 
 import com.slack.api.Slack
+import com.slack.api.methods.request.files.FilesUploadV2Request
 import kotlinx.coroutines.future.await
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -23,15 +24,18 @@ class SlackJobAlert(
 
     override suspend fun invoke(job: Job): Boolean {
         val channel = namespaceToChannel[job.namespace] ?: "k8s-알람"
+        val fileName = "${job.namespace}-${job.cronJobName}.txt"
 
-        return client.filesUpload { builder ->
-            builder.apply {
-                filetype("text")
-                title("${job.namespace}-${job.cronJobName}.txt")
-                channels(listOf(channel))
-                content(job.alertMessage)
-                initialComment("[Job Failed]\nNamespace: ${job.namespace}\nCronJob: ${job.cronJobName}")
-            }
+        return client.filesUploadV2 { req ->
+            req.channel(channel)
+                .uploadFiles(listOf(
+                    FilesUploadV2Request.UploadFile.builder()
+                        .content(job.alertMessage)
+                        .filename(fileName)
+                        .title(fileName)
+                        .build()
+                ))
+                .initialComment("[Job Failed]\nNamespace: ${job.namespace}\nCronJob: ${job.cronJobName}")
         }
             .await()
             .isOk
