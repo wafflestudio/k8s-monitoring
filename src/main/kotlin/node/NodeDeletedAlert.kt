@@ -2,9 +2,9 @@ package com.wafflestudio.k8s.node
 
 import com.slack.api.Slack
 import com.slack.api.methods.request.files.FilesUploadV2Request
+import com.wafflestudio.k8s.discord.DiscordAlertClient
 import kotlinx.coroutines.future.await
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.slf4j.LoggerFactory
@@ -15,7 +15,20 @@ fun interface NodeDeletedAlert {
     suspend fun invoke(node: Node): Boolean
 }
 
-@ConditionalOnProperty("slack.token", matchIfMissing = false)
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "discord")
+@Component
+class DiscordNodeDeletedAlert(
+    private val client: DiscordAlertClient,
+) : NodeDeletedAlert {
+    override suspend fun invoke(node: Node): Boolean =
+        client.send(
+            comment = "[Node Deleted]",
+            fileName = "${node.name}.txt",
+            content = node.deletedAlertMessage,
+        )
+}
+
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "slack")
 @Component
 class SlackNodeDeletedAlert(
     @Value("\${slack.token}") token: String,
@@ -49,7 +62,7 @@ class SlackNodeDeletedAlert(
     }
 }
 
-@ConditionalOnMissingBean(SlackNodeDeletedAlert::class)
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "none", matchIfMissing = true)
 @Component
 class NoOpNodeDeletedAlert : NodeDeletedAlert {
     override suspend fun invoke(node: Node): Boolean {

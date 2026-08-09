@@ -2,10 +2,10 @@ package com.wafflestudio.k8s.pod
 
 import com.slack.api.Slack
 import com.slack.api.methods.request.files.FilesUploadV2Request
+import com.wafflestudio.k8s.discord.DiscordAlertClient
 import com.wafflestudio.k8s.pod.Pod.ContainerStatus.Waiting
 import kotlinx.coroutines.future.await
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.slf4j.LoggerFactory
@@ -16,7 +16,20 @@ fun interface PodAlert {
     suspend fun invoke(pod: Pod): Boolean
 }
 
-@ConditionalOnProperty("slack.token", matchIfMissing = false)
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "discord")
+@Component
+class DiscordPodAlert(
+    private val client: DiscordAlertClient,
+) : PodAlert {
+    override suspend fun invoke(pod: Pod): Boolean =
+        client.send(
+            comment = "[Pod Failed]\nNamespace: ${pod.namespace}\nPod: ${pod.name}",
+            fileName = "${pod.namespace}-${pod.name}.txt",
+            content = pod.alertMessage,
+        )
+}
+
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "slack")
 @Component
 class SlackPodAlert(
     @Value("\${slack.token}") token: String,
@@ -51,7 +64,7 @@ class SlackPodAlert(
     }
 }
 
-@ConditionalOnMissingBean(SlackPodAlert::class)
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "none", matchIfMissing = true)
 @Component
 class NoOpPodAlert : PodAlert {
     override suspend fun invoke(pod: Pod): Boolean {

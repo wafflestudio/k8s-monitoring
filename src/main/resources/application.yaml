@@ -1,2 +1,16 @@
 spring:
   main.web-application-type: none
+
+alert:
+  # 알림 전송 구현체를 하나만 고른다. MakePodAlert 등이 getBean(PodAlert::class.java) 로
+  # 꺼내 쓰기 때문에 인터페이스당 빈이 정확히 하나여야 한다.
+  #   discord -> Discord*Alert  (DISCORD_BOT_TOKEN, DISCORD_DEFAULT_CHANNEL_ID 필요)
+  #   slack   -> Slack*Alert    (SLACK_TOKEN 필요, 채널은 slack.default-channel-id)
+  #   none    -> NoOp*Alert     (stdout 출력만)
+  provider: ${ALERT_PROVIDER:none}
+
+# 아래 토큰/채널은 일부러 기본값을 두지 않는다. provider 만 바꾸고 값 주입을 빠뜨리면
+# 조용히 잘못 도는 대신 기동 시점에 바로 실패하는 편이 낫다.
+#   discord.bot-token          <- DISCORD_BOT_TOKEN
+#   discord.default-channel-id <- DISCORD_DEFAULT_CHANNEL_ID
+#   slack.token                <- SLACK_TOKEN

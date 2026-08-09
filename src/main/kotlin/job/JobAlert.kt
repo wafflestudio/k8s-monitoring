@@ -2,9 +2,9 @@ package com.wafflestudio.k8s.job
 
 import com.slack.api.Slack
 import com.slack.api.methods.request.files.FilesUploadV2Request
+import com.wafflestudio.k8s.discord.DiscordAlertClient
 import kotlinx.coroutines.future.await
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.slf4j.LoggerFactory
@@ -15,7 +15,20 @@ fun interface JobAlert {
     suspend fun invoke(job: Job): Boolean
 }
 
-@ConditionalOnProperty("slack.token", matchIfMissing = false)
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "discord")
+@Component
+class DiscordJobAlert(
+    private val client: DiscordAlertClient,
+) : JobAlert {
+    override suspend fun invoke(job: Job): Boolean =
+        client.send(
+            comment = "[Job Failed]\nNamespace: ${job.namespace}\nCronJob: ${job.cronJobName}",
+            fileName = "${job.namespace}-${job.cronJobName}.txt",
+            content = job.alertMessage,
+        )
+}
+
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "slack")
 @Component
 class SlackJobAlert(
     @Value("\${slack.token}") token: String,
@@ -50,7 +63,7 @@ class SlackJobAlert(
     }
 }
 
-@ConditionalOnMissingBean(SlackJobAlert::class)
+@ConditionalOnProperty(name = ["alert.provider"], havingValue = "none", matchIfMissing = true)
 @Component
 class NoOpJobAlert : JobAlert {
     override suspend fun invoke(job: Job): Boolean {
